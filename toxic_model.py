@@ -155,11 +155,9 @@ def train_model():
 def predict_toxicity(comment):
 
     if not comment or not comment.strip():
-
         raise ValueError("Please enter a comment.")
 
     if not MODEL_PATH.exists():
-
         raise FileNotFoundError(
             "Toxic model not found. Train the model first."
         )
@@ -168,21 +166,24 @@ def predict_toxicity(comment):
 
     cleaned_comment = clean_text(comment)
 
-    predictions = model.predict([cleaned_comment])[0]
-
+    # Get prediction probabilities
     probabilities = model.predict_proba([cleaned_comment])[0]
+
+    # Experimental threshold
+    THRESHOLD = 0.25
 
     results = {}
 
     for i, label in enumerate(LABELS):
 
+        confidence = float(probabilities[i])
+
         results[label] = {
-            "prediction": int(predictions[i]),
-            "confidence": round(float(probabilities[i]) * 100, 2)
+            "prediction": int(confidence >= THRESHOLD),
+            "confidence": round(confidence * 100, 2)
         }
 
     return results
-
 
 # Main execution
 if __name__ == "__main__":
