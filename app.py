@@ -4,15 +4,20 @@ import sqlite3
 import json
 import pandas as pd
 
+from pathlib import Path
 from datetime import datetime
 
 from fake_news_model import predict_news
 from toxic_model import predict_toxicity
 
 
+# ==========================================
 # DATABASE CONFIGURATION
+# ==========================================
 
-DB_PATH = "truthguard_history.db"
+BASE_DIR = Path(__file__).resolve().parent
+
+DB_PATH = BASE_DIR / "truthguard_history.db"
 
 
 def create_database():
@@ -45,7 +50,9 @@ def create_database():
     conn.close()
 
 
-# SAVE HISTORY
+# ==========================================
+# SAVE DETECTION HISTORY
+# ==========================================
 
 def save_history(
     detection_type,
@@ -71,28 +78,31 @@ def save_history(
         )
         VALUES (?, ?, ?, ?, ?, ?)
     """, (
-
         detection_type,
         input_text,
         prediction,
         confidence,
         json.dumps(details or {}),
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     ))
 
     conn.commit()
     conn.close()
 
 
-# GET HISTORY
+# ==========================================
+# GET DETECTION HISTORY
+# ==========================================
 
 def get_history():
 
     conn = sqlite3.connect(DB_PATH)
 
     df = pd.read_sql_query(
-        "SELECT * FROM detection_history ORDER BY id DESC",
+        """
+        SELECT * FROM detection_history
+        ORDER BY id DESC
+        """,
         conn
     )
 
@@ -101,7 +111,9 @@ def get_history():
     return df
 
 
+# ==========================================
 # CLEAR HISTORY
+# ==========================================
 
 def clear_history():
 
@@ -115,7 +127,9 @@ def clear_history():
     conn.close()
 
 
+# ==========================================
 # PAGE CONFIGURATION
+# ==========================================
 
 st.set_page_config(
     page_title="TruthGuard AI",
@@ -124,7 +138,9 @@ st.set_page_config(
 )
 
 
+# ==========================================
 # CUSTOM CSS
+# ==========================================
 
 st.markdown("""
 <style>
@@ -161,12 +177,16 @@ div.stButton > button:hover {
 """, unsafe_allow_html=True)
 
 
-# CREATE DATABASE
+# ==========================================
+# INITIALIZE DATABASE
+# ==========================================
 
 create_database()
 
 
+# ==========================================
 # HEADER
+# ==========================================
 
 st.title("🛡️ TruthGuard AI")
 
@@ -180,25 +200,29 @@ st.markdown(
 st.divider()
 
 
+# ==========================================
 # SIDEBAR NAVIGATION
+# ==========================================
 
-st.sidebar.title("Navigation")
+st.sidebar.title("🛡️ TruthGuard AI")
+
+st.sidebar.write("Navigation")
 
 page = st.sidebar.radio(
-
     "Select Detection Type",
-
     [
         "Home",
         "Fake News Detection",
         "Toxic Content Detection",
-        "Detection History"
+        "Detection History",
+        "Admin Dashboard"
     ]
-
 )
 
 
+# ==========================================
 # HOME PAGE
+# ==========================================
 
 if page == "Home":
 
@@ -238,10 +262,36 @@ if page == "Home":
     - Multi-label Classification
     - Machine Learning
     - SQLite Database
+    - Data Visualization
     """)
 
+    history = get_history()
 
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "Total Analyses",
+        len(history)
+    )
+
+    col2.metric(
+        "Fake News Analyses",
+        len(history[
+            history["detection_type"] == "Fake News Detection"
+        ])
+    )
+
+    col3.metric(
+        "Toxic Analyses",
+        len(history[
+            history["detection_type"] == "Toxic Content Detection"
+        ])
+    )
+
+
+# ==========================================
 # FAKE NEWS DETECTION
+# ==========================================
 
 elif page == "Fake News Detection":
 
@@ -293,8 +343,6 @@ elif page == "Fake News Detection":
                     "not independent verification."
                 )
 
-                # SAVE RESULT
-
                 save_history(
                     "Fake News Detection",
                     news_text,
@@ -302,14 +350,18 @@ elif page == "Fake News Detection":
                     confidence
                 )
 
-                st.success("Analysis saved to Detection History.")
+                st.success(
+                    "Analysis saved to Detection History."
+                )
 
             except Exception as e:
 
                 st.error(f"Prediction failed: {e}")
 
 
+# ==========================================
 # TOXIC CONTENT DETECTION
+# ==========================================
 
 elif page == "Toxic Content Detection":
 
@@ -340,14 +392,9 @@ elif page == "Toxic Content Detection":
                     results = predict_toxicity(comment)
 
                 toxic_categories = [
-
                     name for name, value in results.items()
-
                     if value["prediction"] == 1
-
                 ]
-
-                # OVERALL RESULT
 
                 if toxic_categories:
 
@@ -373,8 +420,6 @@ elif page == "Toxic Content Detection":
                         "✅ No Toxic Categories Detected"
                     )
 
-                # CATEGORY ANALYSIS
-
                 st.subheader("Category Analysis")
 
                 for category, value in results.items():
@@ -383,7 +428,7 @@ elif page == "Toxic Content Detection":
 
                     confidence = value["confidence"]
 
-                    prediction_status = value["prediction"]
+                    status = value["prediction"]
 
                     st.write(f"**{name}**")
 
@@ -393,7 +438,7 @@ elif page == "Toxic Content Detection":
 
                     st.caption(
                         f"Prediction: "
-                        f"{'Detected' if prediction_status == 1 else 'Not Detected'}"
+                        f"{'Detected' if status == 1 else 'Not Detected'}"
                         f" | Score: {confidence}%"
                     )
 
@@ -401,27 +446,31 @@ elif page == "Toxic Content Detection":
                     "Scores are model estimates, not verified probabilities."
                 )
 
-                # SAVE RESULT
+                max_confidence = max(
+                    value["confidence"]
+                    for value in results.values()
+                )
 
                 save_history(
                     "Toxic Content Detection",
                     comment,
                     prediction,
-                    max(
-                        value["confidence"]
-                        for value in results.values()
-                    ),
+                    max_confidence,
                     results
                 )
 
-                st.success("Analysis saved to Detection History.")
+                st.success(
+                    "Analysis saved to Detection History."
+                )
 
             except Exception as e:
 
                 st.error(f"Prediction failed: {e}")
 
 
+# ==========================================
 # DETECTION HISTORY
+# ==========================================
 
 elif page == "Detection History":
 
@@ -435,11 +484,12 @@ elif page == "Detection History":
 
     if history.empty:
 
-        st.info("No detection history available yet.")
+        st.info(
+            "No detection history available yet. "
+            "Perform an analysis first."
+        )
 
     else:
-
-        # STATISTICS
 
         total = len(history)
 
@@ -465,8 +515,6 @@ elif page == "Detection History":
 
         st.divider()
 
-        # HISTORY TABLE
-
         st.subheader("Previous Analyses")
 
         display_history = history[
@@ -484,8 +532,6 @@ elif page == "Detection History":
             use_container_width=True,
             hide_index=True
         )
-
-        # DETAILED HISTORY
 
         st.subheader("Analysis Details")
 
@@ -520,8 +566,6 @@ elif page == "Detection History":
 
         st.divider()
 
-        # DOWNLOAD HISTORY
-
         st.subheader("Download History")
 
         csv_data = history.to_csv(index=False).encode("utf-8")
@@ -534,8 +578,6 @@ elif page == "Detection History":
         )
 
         st.divider()
-
-        # CLEAR HISTORY
 
         st.subheader("Manage History")
 
@@ -572,7 +614,194 @@ elif page == "Detection History":
                     st.rerun()
 
 
+# ==========================================
+# ADMIN DASHBOARD
+# ==========================================
+
+elif page == "Admin Dashboard":
+
+    st.header("📊 Admin Dashboard")
+
+    st.write(
+        "Monitor Fake News and Toxic Content Detection activities."
+    )
+
+    history = get_history()
+
+    if history.empty:
+
+        st.info(
+            "No analysis data available. "
+            "Perform some detections to view dashboard statistics."
+        )
+
+    else:
+
+        # Overall statistics
+
+        total_analyses = len(history)
+
+        news_analyses = len(
+            history[
+                history["detection_type"] == "Fake News Detection"
+            ]
+        )
+
+        toxic_analyses = len(
+            history[
+                history["detection_type"] == "Toxic Content Detection"
+            ]
+        )
+
+        fake_news_count = len(
+            history[
+                (history["detection_type"] == "Fake News Detection") &
+                (history["prediction"] == "Fake News")
+            ]
+        )
+
+        real_news_count = len(
+            history[
+                (history["detection_type"] == "Fake News Detection") &
+                (history["prediction"] == "Real News")
+            ]
+        )
+
+        toxic_count = len(
+            history[
+                (history["detection_type"] == "Toxic Content Detection") &
+                (history["prediction"] == "Potentially Toxic Content")
+            ]
+        )
+
+        safe_count = len(
+            history[
+                (history["detection_type"] == "Toxic Content Detection") &
+                (history["prediction"] == "No Toxic Categories Detected")
+            ]
+        )
+
+        # Overall dashboard
+
+        st.subheader("Overall Statistics")
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Total Analyses", total_analyses)
+
+        col2.metric("News Analyses", news_analyses)
+
+        col3.metric("Toxic Analyses", toxic_analyses)
+
+        st.divider()
+
+        # Fake news statistics
+
+        st.subheader("📰 Fake News Analysis")
+
+        col1, col2 = st.columns(2)
+
+        col1.metric("Fake News Detected", fake_news_count)
+
+        col2.metric("Real News Predicted", real_news_count)
+
+        news_chart = pd.DataFrame({
+            "Category": ["Fake News", "Real News"],
+            "Count": [fake_news_count, real_news_count]
+        })
+
+        st.bar_chart(
+            news_chart.set_index("Category")
+        )
+
+        st.divider()
+
+        # Toxic content statistics
+
+        st.subheader("🚨 Toxic Content Analysis")
+
+        col1, col2 = st.columns(2)
+
+        col1.metric("Potentially Toxic", toxic_count)
+
+        col2.metric("No Toxic Categories", safe_count)
+
+        toxic_chart = pd.DataFrame({
+            "Category": [
+                "Potentially Toxic",
+                "No Toxic Categories"
+            ],
+            "Count": [
+                toxic_count,
+                safe_count
+            ]
+        })
+
+        st.bar_chart(
+            toxic_chart.set_index("Category")
+        )
+
+        st.divider()
+
+        # Daily report
+
+        st.subheader("📈 Daily Analysis Report")
+
+        history["created_at"] = pd.to_datetime(
+            history["created_at"],
+            errors="coerce"
+        )
+
+        daily_data = (
+            history.dropna(subset=["created_at"])
+            .assign(
+                Date=lambda df: df["created_at"].dt.strftime("%Y-%m-%d")
+            )
+            .groupby("Date")
+            .size()
+            .reset_index(name="Analyses")
+        )
+
+        if not daily_data.empty:
+
+            st.line_chart(
+                daily_data.set_index("Date")
+            )
+
+        else:
+
+            st.info("No date information available.")
+
+        st.divider()
+
+        # Recent activities
+
+        st.subheader("🕒 Recent Activities")
+
+        recent = history.head(10)
+
+        st.dataframe(
+            recent[
+                [
+                    "id",
+                    "detection_type",
+                    "prediction",
+                    "created_at"
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.caption(
+            "Dashboard statistics are calculated "
+            "from saved detection history."
+        )
+
+
+# ==========================================
 # FOOTER
+# ==========================================
 
 st.divider()
 
