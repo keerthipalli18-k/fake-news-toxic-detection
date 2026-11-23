@@ -1,3 +1,4 @@
+
 import streamlit as st
 
 from fake_news_model import predict_news
@@ -79,7 +80,7 @@ page = st.sidebar.radio(
 )
 
 
-# Home page
+# HOME PAGE
 if page == "Home":
 
     st.header("Welcome to TruthGuard AI")
@@ -120,7 +121,7 @@ if page == "Home":
     """)
 
 
-# Fake News Detection
+# FAKE NEWS DETECTION
 elif page == "Fake News Detection":
 
     st.header("📰 Fake News Detection")
@@ -175,7 +176,7 @@ elif page == "Fake News Detection":
                 st.error(f"Prediction failed: {e}")
 
 
-# Toxic Content Detection
+# TOXIC CONTENT DETECTION
 elif page == "Toxic Content Detection":
 
     st.header("🚨 Toxic Content Detection")
@@ -209,9 +210,12 @@ elif page == "Toxic Content Detection":
                     if value["prediction"] == 1
                 ]
 
+                # Overall result
                 if toxic_categories:
 
-                    st.error("⚠️ Potentially Toxic Content Detected")
+                    st.error(
+                        "⚠️ Potentially Toxic Content Detected"
+                    )
 
                     st.subheader("Detected Categories")
 
@@ -223,35 +227,44 @@ elif page == "Toxic Content Detection":
 
                 else:
 
-                    st.success("✅ No Toxic Categories Detected")
+                    st.success(
+                        "✅ No Toxic Categories Detected"
+                    )
 
+                # Category analysis
                 st.subheader("Category Analysis")
 
                 for category, value in results.items():
 
                     name = category.replace("_", " ").title()
 
+                    confidence = value["confidence"]
+
+                    prediction = value["prediction"]
+
                     st.write(f"**{name}**")
 
                     st.progress(
-                        min(
-                            max(value["confidence"] / 100, 0.0),
-                            1.0
-                        )
+                        min(max(confidence / 100, 0.0), 1.0)
                     )
 
                     st.caption(
                         f"Prediction: "
-                        f"{'Detected' if value['prediction'] == 1 else 'Not Detected'}"
-                        f" | Score: {value['confidence']}%"
+                        f"{'Detected' if prediction == 1 else 'Not Detected'}"
+                        f" | Score: {confidence}%"
                     )
+
+                st.caption(
+                    "Detection threshold: 50%. "
+                    "Scores represent model estimates, not verified probabilities."
+                )
 
             except Exception as e:
 
                 st.error(f"Prediction failed: {e}")
 
 
-# Footer
+# FOOTER
 st.divider()
 
 st.markdown(

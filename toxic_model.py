@@ -1,3 +1,4 @@
+
 import pandas as pd
 import joblib
 import re
@@ -33,6 +34,10 @@ LABELS = [
 ]
 
 
+# Detection threshold
+THRESHOLD = 0.50
+
+
 # Text preprocessing
 def clean_text(text):
 
@@ -55,7 +60,6 @@ def train_model():
     data = pd.read_csv(DATASET_PATH)
 
     print("Dataset loaded successfully!")
-
     print("Dataset shape:", data.shape)
 
     # Check required columns
@@ -64,7 +68,6 @@ def train_model():
     for column in required_columns:
 
         if column not in data.columns:
-
             raise ValueError(f"Missing column: {column}")
 
     # Remove missing comments
@@ -92,7 +95,6 @@ def train_model():
     )
 
     print("Training samples:", len(X_train))
-
     print("Testing samples:", len(X_test))
 
     # Create model
@@ -142,12 +144,11 @@ def train_model():
     )
 
     # Save model
-    MODEL_DIR.mkdir(exist_ok=True)
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
     joblib.dump(model, MODEL_PATH, compress=3)
 
     print("\nToxic Model saved successfully!")
-
     print("Saved location:", MODEL_PATH)
 
 
@@ -155,35 +156,43 @@ def train_model():
 def predict_toxicity(comment):
 
     if not comment or not comment.strip():
+
         raise ValueError("Please enter a comment.")
 
     if not MODEL_PATH.exists():
+
         raise FileNotFoundError(
             "Toxic model not found. Train the model first."
         )
 
+    # Load model
     model = joblib.load(MODEL_PATH)
 
+    # Clean input
     cleaned_comment = clean_text(comment)
 
-    # Get prediction probabilities
-    probabilities = model.predict_proba([cleaned_comment])[0]
+    if not cleaned_comment:
+        raise ValueError("Please enter valid text.")
 
-    # Experimental threshold
-    THRESHOLD = 0.25
+    # Get probabilities
+    probabilities = model.predict_proba([cleaned_comment])[0]
 
     results = {}
 
+    # Apply consistent threshold
     for i, label in enumerate(LABELS):
 
-        confidence = float(probabilities[i])
+        confidence = float(probabilities[i]) * 100
+
+        prediction = int(confidence >= THRESHOLD * 100)
 
         results[label] = {
-            "prediction": int(confidence >= THRESHOLD),
-            "confidence": round(confidence * 100, 2)
+            "prediction": prediction,
+            "confidence": round(confidence, 2)
         }
 
     return results
+
 
 # Main execution
 if __name__ == "__main__":
